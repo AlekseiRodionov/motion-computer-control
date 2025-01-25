@@ -110,7 +110,7 @@ class GestureDetector():
             y1 = float(box[1] + box[3] / 2)
             x2 = float(box[0] + box[2] / 2)
             y2 = float(box[1] - box[3] / 2)
-            x1y1x2y2_boxes.append([x1, y1, x2, y2])
+            x1y1x2y2_boxes.append(torch.tensor([x1, y1, x2, y2]))
         return x1y1x2y2_boxes
 
     def x1y1x2y2_to_xywh(self, boxes):
@@ -120,7 +120,7 @@ class GestureDetector():
             y_center = float(box[1] + box[3]) / 2
             w = float(box[2] - box[0])
             h = float(box[3] - box[1])
-            xywh_boxes.append([x_center, y_center, w, h])
+            xywh_boxes.append(torch.tensor([x_center, y_center, w, h]))
         return xywh_boxes
 
     def predict(self, image, conf=0.5, iou=0.5, used_gestures=ALL_GESTURES, coords_format='xywh'):
