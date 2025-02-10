@@ -2,6 +2,8 @@ from ultralytics import YOLO
 import torch
 from torchvision.transforms.functional import to_tensor
 from torchvision.models.detection import ssdlite320_mobilenet_v3_large
+import os
+import cv2
 
 ALL_GESTURES = (
 0, #'grabbing',
@@ -39,6 +41,37 @@ ALL_GESTURES = (
 32, #'thumb_index2',
 33, #'no_gesture'
 )
+
+class SSDLiteDataset(torch.utils.data.Dataset):
+    def __init__(self, path_to_data, transforms):
+        self.path_to_data = path_to_data
+        self.transforms = transforms
+        self.images = list(sorted(os.listdir(os.path.join(path_to_data, 'images'))))
+        self.labels = list(sorted(os.listdir(os.path.join(path_to_data, 'labels'))))
+
+    def __getitem__(self, item):
+        image_path = os.path.join(self.path_to_data, 'images', self.images[item])
+        label_path = os.path.join(self.path_to_data, 'images', self.images[item])
+        image = to_tensor(cv2.imread(image_path)).unsqueeze(dim=0)
+        with open(label_path, 'r', encoding='utf8') as label_file:
+            labels_boxes_list = label_file.read().split('\n')
+            target = {
+                'boxes': [],
+                'labels': []
+            }
+            for label_box in labels_boxes_list:
+                label = label_box.split(' ')[0]
+                box = label_box.split(' ')[1:]
+                box = map(lambda x: float(x), box)
+                if self.transforms is not None:
+                    box = self.transforms([box])
+                target['labels'].append(torch.tensor(float(label)))
+                target['boxes'].append(to_tensor(box))
+        return image, target
+
+    def __len__(self):
+        return len(self.images)
+
 
 class GestureDetector():
     """
@@ -136,10 +169,10 @@ class GestureDetector():
         if self.model_type == 'SSDLite':
             image_tensor = to_tensor(image).unsqueeze(dim=0)
             y_pred = self.model(image_tensor)[0]
-            if not len(y_pred['boxes'].size()):
-                return None
             y_pred['boxes'] = y_pred['boxes'][y_pred['scores'] > conf]
             y_pred['labels'] = y_pred['labels'][y_pred['scores'] > conf]
+            if not y_pred['boxes'].size()[0]:
+                return None
             if coords_format == 'xywh':
                 y_pred['boxes'] = self.x1y1x2y2_to_xywh(y_pred['boxes'])
             y_pred = self.__is_used_gesture(y_pred, used_gestures)
@@ -147,5 +180,24 @@ class GestureDetector():
             result = {'boxes': nms_boxes, 'labels': nms_labels}
         if self.model_type == 'onnx':
             pass
-
         return result
+
+    def fit(self, path_to_data, epochs, final_checkpoint_name, final_model_type):
+        if self.model_type == 'YOLO':
+            self.model.train(data=os.path.join(path_to_data, 'data.yaml'),
+                             epochs=epochs,
+                             imgsz=640,
+                             freeze=21,
+                             project=os.getcwd()
+                             )
+            print(f'Обучение завершено. Новый чекпойнт сохранён по указанному пути.\n')
+            input('Нажмите Enter для завершения обучения.')
+        if final_model_type == 'YOLO':
+            self.model.save(final_checkpoint_name + '.pt')
+        if self.model_type == 'SSDLite':
+            dataset_generator = SSDLiteDataset(path_to_data, self.xywh_to_x1y1x2y2)
+
+
+
+
+
