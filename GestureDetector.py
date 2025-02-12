@@ -2,6 +2,8 @@ from ultralytics import YOLO
 import torch
 from torchvision.transforms.functional import to_tensor
 from torchvision.models.detection import ssdlite320_mobilenet_v3_large
+from ssdlite_train.engine import train_one_epoch, evaluate
+from ssdlite_train import utils
 import os
 import cv2
 
@@ -48,13 +50,18 @@ class SSDLiteDataset(torch.utils.data.Dataset):
         self.transforms = transforms
         self.images = list(sorted(os.listdir(os.path.join(path_to_data, 'images'))))
         self.labels = list(sorted(os.listdir(os.path.join(path_to_data, 'labels'))))
+        if len(self.images) % 2 != 0:
+            self.images.append(self.images[0])
+            self.labels.append(self.labels[0])
+        self.image_id = 0
 
     def __getitem__(self, item):
         image_path = os.path.join(self.path_to_data, 'images', self.images[item])
-        label_path = os.path.join(self.path_to_data, 'images', self.images[item])
-        image = to_tensor(cv2.imread(image_path)).unsqueeze(dim=0)
+        label_path = os.path.join(self.path_to_data, 'labels', self.labels[item])
+        image = to_tensor(cv2.imread(image_path))
+        image_size = image.size()[1:]
         with open(label_path, 'r', encoding='utf8') as label_file:
-            labels_boxes_list = label_file.read().split('\n')
+            labels_boxes_list = label_file.read().split('\n')[:-1]
             target = {
                 'boxes': [],
                 'labels': []
@@ -62,11 +69,24 @@ class SSDLiteDataset(torch.utils.data.Dataset):
             for label_box in labels_boxes_list:
                 label = label_box.split(' ')[0]
                 box = label_box.split(' ')[1:]
-                box = map(lambda x: float(x), box)
-                if self.transforms is not None:
-                    box = self.transforms([box])
+                box = list(map(lambda x: float(x), box))
+                box[0] = int(box[0] * image_size[0])
+                box[1] = int(box[1] * image_size[1])
+                box[2] = int(box[2] * image_size[0])
+                box[3] = int(box[3] * image_size[1])
                 target['labels'].append(torch.tensor(float(label)))
-                target['boxes'].append(to_tensor(box))
+                if self.transforms is not None:
+                    box = self.transforms([box])[0]
+                    new_box = torch.tensor([float(box[0]) if box[0] < box[2] else float(box[2]),
+                                            float(box[1]) if box[1] < box[3] else float(box[3]),
+                                            float(box[2]) if box[2] >= box[0] else float(box[0]),
+                                            float(box[3]) if box[3] >= box[1] else float(box[1]),
+                                            ])
+                    target['boxes'].append(new_box)
+                else:
+                    target['boxes'].append(torch.tensor(box))
+        target['boxes'] = torch.stack(target['boxes'], dim=0)
+        target['labels'] = torch.stack(target['labels'], dim=0).long()
         return image, target
 
     def __len__(self):
@@ -187,17 +207,46 @@ class GestureDetector():
             self.model.train(data=os.path.join(path_to_data, 'data.yaml'),
                              epochs=epochs,
                              imgsz=640,
-                             freeze=21,
+                             freeze=20,
                              project=os.getcwd()
                              )
-            print(f'Обучение завершено. Новый чекпойнт сохранён по указанному пути.\n')
-            input('Нажмите Enter для завершения обучения.')
-        if final_model_type == 'YOLO':
-            self.model.save(final_checkpoint_name + '.pt')
+            self.model.save(final_checkpoint_name)
+
         if self.model_type == 'SSDLite':
+            device = torch.device('cpu')
             dataset_generator = SSDLiteDataset(path_to_data, self.xywh_to_x1y1x2y2)
+            dataloader = torch.utils.data.DataLoader(
+                dataset_generator,
+                batch_size=2,
+                shuffle=False,
+                collate_fn=utils.collate_fn
+            )
+            self.model.to(device)
+            params = [p for p in self.model.parameters() if p.requires_grad]
+            for i, p in enumerate(params):
+                if i < len(params) - 36:
+                    p.requires_grad = False
+            optimizer = torch.optim.SGD(
+                params,
+                lr=0.005,
+                momentum=0.9,
+                weight_decay=0.0005
+            )
+            lr_sheduler = torch.optim.lr_scheduler.StepLR(
+                optimizer,
+                step_size=3,
+                gamma=0.1
+            )
 
+            for epoch in range(epochs):
+                train_one_epoch(self.model, optimizer, dataloader, device, epoch, print_freq=10)
+                lr_sheduler.step()
+                checkpoint = {
+                    'epoch': epoch,
+                    'MODEL_STATE': self.model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                }
+            torch.save(checkpoint, final_checkpoint_name)
 
-
-
-
+        print(f'Обучение завершено. Новый чекпойнт сохранён по указанному пути.\n')
+        input('Нажмите Enter для завершения обучения.')
