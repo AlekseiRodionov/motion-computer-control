@@ -394,7 +394,10 @@ class mywindow(QtWidgets.QMainWindow):
     def on_new_checkpoint_for_training_click(self):
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, 'Укажите путь к итоговому чекпойнту', '')
         if filename:
-            self.ui.lineEdit_16.setText(filename)
+            if self.ui.comboBox_6.currentText() == 'YOLO':
+                self.ui.lineEdit_16.setText(filename + '.pt')
+            else:
+                self.ui.lineEdit_16.setText(filename + '.pth')
 
     def on_start_training_click(self):
         config_dict = {
