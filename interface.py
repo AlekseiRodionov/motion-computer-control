@@ -12,6 +12,8 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(999, 819)
+        icon = QtGui.QIcon.fromTheme("SP_ComputerIcon")
+        MainWindow.setWindowIcon(icon)
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.Tabs = QtWidgets.QTabWidget(self.centralwidget)
@@ -365,7 +367,7 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        MainWindow.setWindowTitle(_translate("MainWindow", "Motion Control"))
         self.Main.setToolTip(_translate("MainWindow", "<html><head/><body><p>Главная</p></body></html>"))
         self.groupBox.setTitle(_translate("MainWindow", "Настройка команд"))
         self.label.setText(_translate("MainWindow", "Путь к json-файлу с командами:"))

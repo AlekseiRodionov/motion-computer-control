@@ -11,7 +11,10 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MainWindow</string>
+   <string>Motion Control</string>
+  </property>
+  <property name="windowIcon">
+   <iconset theme="SP_ComputerIcon"/>
   </property>
   <widget class="QWidget" name="centralwidget">
    <widget class="QTabWidget" name="Tabs">
