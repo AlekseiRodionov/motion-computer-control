@@ -52,6 +52,7 @@ ALL_GESTURES = {
 '33': 'no_gesture'
 }
 
+
 class CameraThread(QThread):
     image = pyqtSignal(np.ndarray)
 

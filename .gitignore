@@ -2,3 +2,7 @@
 venv/
 Data/
 __pycache__
+train/
+train_config.json
+test_config.json
+config.json
