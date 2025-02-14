@@ -4,3 +4,4 @@ torch
 torchvision
 ultralytics
 opencv-python
+PyQT5

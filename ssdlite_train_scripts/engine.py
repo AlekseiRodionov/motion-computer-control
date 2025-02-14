@@ -4,9 +4,9 @@ import time
 
 import torch
 import torchvision.models.detection.mask_rcnn
-from ssdlite_train import utils
-from ssdlite_train.coco_eval import CocoEvaluator
-from ssdlite_train.coco_utils import get_coco_api_from_dataset
+from ssdlite_train_scripts import utils
+from ssdlite_train_scripts.coco_eval import CocoEvaluator
+from ssdlite_train_scripts.coco_utils import get_coco_api_from_dataset
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, scaler=None):

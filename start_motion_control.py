@@ -2,14 +2,19 @@ from GestureDetector import GestureDetector
 from CommandExecutor import CommandExecutor
 import json
 import cv2
+import os
 
-with open('config.json', 'r') as config_file:
+with open(os.path.join('configs', 'start_config.json'), 'r') as config_file:
     config_dict = json.load(config_file)
 
+print('Запуск программы...')
 model = GestureDetector(model_type=config_dict['model_type'], path_to_file=config_dict['checkpoint_path'])
 executor = CommandExecutor()
 executor.load_commands_dict(config_dict['command_file_path'])
+
+print('Включение камеры...')
 camera = cv2.VideoCapture(config_dict['camera_index'])
+print('Камера включена. Программа работает.')
 
 while True:
     _, image = camera.read()

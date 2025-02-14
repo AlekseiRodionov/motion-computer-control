@@ -1,4 +1,4 @@
-from PyQt5 import QtWidgets, QtGui
+from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QInputDialog
 
 from interface import Ui_MainWindow
@@ -9,10 +9,9 @@ from pygrabber.dshow_graph import FilterGraph
 import cv2
 import numpy as np
 
-from PyQt5.QtCore import Qt, QTimer, QThread, pyqtSignal
-from PyQt5.QtGui import QImage, QPixmap, QPainter, QPen, QColor
+from PyQt5.QtCore import QTimer, QThread, pyqtSignal
+from PyQt5.QtGui import QImage, QPixmap
 
-from GestureDetector import GestureDetector
 from CommandExecutor import CommandExecutor
 
 ALL_GESTURES = {
@@ -204,7 +203,7 @@ class mywindow(QtWidgets.QMainWindow):
             'conf': self.ui.lineEdit_4.text(),
             'iou': self.ui.lineEdit_5.text(),
         }
-        with open('config.json', 'w', encoding='utf8') as command_file:
+        with open(os.path.join('configs', 'start_config.json'), 'w', encoding='utf8') as command_file:
             json.dump(config_dict, command_file)
         os.startfile('start_motion_control.py')
 
@@ -409,9 +408,9 @@ class mywindow(QtWidgets.QMainWindow):
             'final_model_type': self.ui.comboBox_6.currentText(),
             'final_checkpoint_name': self.ui.lineEdit_16.text()
         }
-        with open('train_config.json', 'w', encoding='utf8') as command_file:
+        with open(os.path.join('configs', 'train_config.json'), 'w', encoding='utf8') as command_file:
             json.dump(config_dict, command_file)
-        os.startfile('train_detector.py')
+        os.startfile('detector_training.py')
 
     def on_test_checkpoint_click(self):
         filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '')
@@ -426,9 +425,9 @@ class mywindow(QtWidgets.QMainWindow):
             'conf': self.ui.lineEdit_15.text(),
             'iou': self.ui.lineEdit_14.text()
         }
-        with open('test_config.json', 'w', encoding='utf8') as command_file:
+        with open(os.path.join('configs', 'test_config.json'), 'w', encoding='utf8') as command_file:
             json.dump(config_dict, command_file)
-        os.startfile('detector_test.py')
+        os.startfile('detector_evaluation.py')
 
 
 app = QtWidgets.QApplication([])

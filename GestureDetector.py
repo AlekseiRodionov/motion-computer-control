@@ -2,8 +2,8 @@ from ultralytics import YOLO
 import torch
 from torchvision.transforms.functional import to_tensor
 from torchvision.models.detection import ssdlite320_mobilenet_v3_large
-from ssdlite_train.engine import train_one_epoch, evaluate
-from ssdlite_train import utils
+from ssdlite_train_scripts.engine import train_one_epoch
+from ssdlite_train_scripts import utils
 import os
 import cv2
 
@@ -247,6 +247,3 @@ class GestureDetector():
                     'optimizer_state_dict': optimizer.state_dict(),
                 }
             torch.save(checkpoint, final_checkpoint_name)
-
-        print(f'Обучение завершено. Новый чекпойнт сохранён по указанному пути.\n')
-        input('Нажмите Enter для завершения обучения.')

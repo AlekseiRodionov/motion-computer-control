@@ -1,6 +1,7 @@
 import cv2
 from GestureDetector import GestureDetector
 import json
+import os
 
 ALL_GESTURES = {
 '0': 'grabbing',
@@ -40,11 +41,13 @@ ALL_GESTURES = {
 }
 
 
-with open('test_config.json', 'r', encoding='utf8') as train_config_file:
+with open(os.path.join('configs', 'test_config.json'), 'r', encoding='utf8') as train_config_file:
     config = json.loads(train_config_file.read())
 
 model = GestureDetector(config['model_type'], config['path_to_init_checkpoint'])
+print('Включение камеры...')
 camera = cv2.VideoCapture(int(config['camera_index']))
+print('Камера включена. Чтобы закончить тестирование, закройте это окно.')
 
 while True:
     return_value, image = camera.read()
