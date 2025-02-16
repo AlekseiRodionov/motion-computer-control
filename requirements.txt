@@ -1,7 +1,8 @@
-numpy
-pandas
-torch
-torchvision
-ultralytics
-opencv-python
-PyQT5
+numpy~=2.0.2
+torch~=2.5.1
+torchvision~=0.20.1
+ultralytics~=8.3.65
+opencv-python~=4.11.0.86
+PyQT5~=5.15.9
+pygrabber~=0.2
+pycocotools~=2.0.8
