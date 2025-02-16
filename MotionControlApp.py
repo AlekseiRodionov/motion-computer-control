@@ -1065,6 +1065,7 @@ class MotionControlApp(QtWidgets.QMainWindow):
         if len(self.bounding_box_coords) == 2:
             self.__paint_point(self.bounding_box_coords[0], self.bounding_box_coords[1])
         else:
+            self.__paint_point(self.bounding_box_coords[2], self.bounding_box_coords[3])
             self.__paint_rectangle(self.bounding_box_coords[0], self.bounding_box_coords[1],
                                    self.bounding_box_coords[2], self.bounding_box_coords[3])
             self.__class_labeling()
