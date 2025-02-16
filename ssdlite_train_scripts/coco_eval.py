@@ -5,7 +5,7 @@ from contextlib import redirect_stdout
 import numpy as np
 import pycocotools.mask as mask_util
 import torch
-from ssdlite_train import utils
+from ssdlite_train_scripts import utils
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 
