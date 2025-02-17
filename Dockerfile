@@ -1,10 +1,8 @@
-FROM python:3.9
-MAINTAINER Aleksei_Rodionov
-LABEL version="1.0"
+FROM ubuntu:latest
+RUN apt-get update -y
+RUN apt-get install -y python3-pip python-dev-is-python3 build-essential
 WORKDIR /usr/src/app
-COPY requirements.txt ./
-RUN pip install --no-cache-dir --upgrade pip \
-  && pip install --no-cache-dir -r requirements.txt
-RUN apt-get update && apt-get install libgl1 -y
 COPY . .
-ENTRYPOINT ["python", "./test.py"]
+RUN pip install --break-system-packages -r requirements.txt
+#RUN apt-get update && apt-get install libgl1 -y
+ENTRYPOINT ["python", "./MotionControlApp.py"]
