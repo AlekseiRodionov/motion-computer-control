@@ -1,1 +1,1 @@
-{"command_file_path": "C:/Work/motion-computer-control/test_commands.json", "model_type": "YOLO", "path_to_checkpoint": "C:/Work/motion-computer-control/checkpoints/YOLOv10n_gestures.pt", "camera_index": 0, "conf": "0.5", "iou": "0.5"}
+{"command_file_path": "C:/Work/motion-computer-control/algorithms/examples/test_commands.json", "model_type": "YOLO", "path_to_checkpoint": "C:/Work/motion-computer-control/checkpoints/YOLOv10n_gestures.pt", "camera_index": 0, "conf": "0.50", "iou": "0.50"}

@@ -9,9 +9,10 @@ class CommandExecutor:
 
     Attributes:
         commands_dict (dict): A dictionary mapping gestures (keys) to python-script paths (values).
-        commands_variables (dict): A dictionary (initially empty) intended for use by the user in Python scripts.
-                                   It is passed to and returned from all called scripts. This allows the user to
-                                   organize the exchange of information between different scripts.
+        commands_variables (dict): A dictionary (initially empty) intended for use by the users in their scripts.
+                                   In their scripts, the user can access the CommandExecutor class object,
+                                   which calls user scripts. Accordingly, to transfer information from one script
+                                   to another, the user can use the commands_variables.
     """
 
     def __init__(self):
@@ -75,11 +76,11 @@ class CommandExecutor:
     def execute_command(self, gesture: str, coords: tuple[float, float, float, float]):
         """
         The method executes the algorithm corresponding to the received gesture.
-        Note: in order for the algorithm to be executed, the Python script associated with the gesture
-        must have a function named main (this is the one that is executed). This function must accept three
-        arguments - the gesture itself, its coordinates, and the commands_variables dictionary.
-        In addition, it must return the commands_variables dictionary. The user can change the
-        commands_variables dictionary at his own discretion and thus pass information between different scripts.
+        Note: to execute the algorithm, the Python script associated with the gesture
+        must have a function named main (this is the one that is executed).
+        This function must accept three arguments - the gesture itself (name of a gesture - type str), its coordinates,
+        and a CommandExecutor class object itself. Thus, the user can change the CommandExecutor parameters at his
+        own discretion within his script and pass information between different scripts.
 
         Args:
             gesture (str): A gesture for which a Python script was previously associated (in the create_command method).
@@ -91,4 +92,4 @@ class CommandExecutor:
         algorithm_path = self.commands_dict.get(gesture)
         if algorithm_path is not None:
             algorithm = SourceFileLoader('algorithm', algorithm_path).load_module()
-            self.commands_variables = algorithm.main(gesture, coords, self.commands_variables)
+            algorithm.main(gesture, coords, self)
