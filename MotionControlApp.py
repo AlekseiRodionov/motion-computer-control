@@ -5,9 +5,9 @@ import json
 from PyQt5.QtCore import QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5 import QtWidgets
-from pygrabber.dshow_graph import FilterGraph
 import numpy as np
 import cv2
+from cv2_enumerate_cameras import enumerate_cameras
 
 from CommandExecutor import CommandExecutor
 from interface import Ui_MainWindow
@@ -706,11 +706,14 @@ class MotionControlApp(QtWidgets.QMainWindow):
         Returns:
             None.
         """
-        cameras = FilterGraph().get_input_devices()
-        for camera_name in cameras:
-            self.ui.main_camera_box.addItem(camera_name)
-            self.ui.data_camera_box.addItem(camera_name)
-            self.ui.test_camera_box.addItem(camera_name)
+        available_cameras = []
+        for camera_info in enumerate_cameras(cv2.CAP_ANY):
+            if camera_info.name not in available_cameras:
+                available_cameras.append(camera_info.name)
+        for camera in available_cameras:
+            self.ui.main_camera_box.addItem(camera)
+            self.ui.data_camera_box.addItem(camera)
+            self.ui.test_camera_box.addItem(camera)
 
     def __show_message(self, window_name: str, text: str, icon: int):
         """
