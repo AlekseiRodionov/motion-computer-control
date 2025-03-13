@@ -2,6 +2,8 @@ import os
 
 import cv2
 import torch
+import numpy as np
+import onnxruntime as ort
 from ultralytics import YOLO
 from torchvision.transforms.functional import to_tensor
 from torchvision.models.detection import ssdlite320_mobilenet_v3_large
@@ -142,6 +144,8 @@ class GestureDetector:
             gesture_checkpoint = torch.load(path_to_checkpoint, map_location=torch.device('cpu'))
             self.model.load_state_dict(gesture_checkpoint['MODEL_STATE'])
             self.model.eval()
+        if self.model_type == 'ONNX':
+            self.model = ort.InferenceSession(path_to_checkpoint, providers=['CPUExecutionProvider'])
 
     def __intersection(self, box1: torch.tensor, box2: torch.tensor):
         """
@@ -225,6 +229,39 @@ class GestureDetector:
             boxes, labels = new_boxes, new_labels
         return nms_boxes, nms_labels
 
+    def __onnx_letterbox_image(self, image, expected_size):
+        ih, iw = image.shape[0:2]
+        ew, eh = expected_size
+        scale = min(eh / ih, ew / iw)
+        nh = int(ih * scale)
+        nw = int(iw * scale)
+        image = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
+        top = (eh - nh) // 2
+        bottom = eh - nh - top
+        left = (ew - nw) // 2
+        right = ew - nw - left
+        new_img = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT)
+        return new_img
+
+    def __onnx_image_preprocess(self, image, input_shape):
+        image = self.__onnx_letterbox_image(image, input_shape)
+        transposed_image = image.transpose(2, 0, 1)[None, ...]
+        normalized_image = transposed_image / 255.0
+        preprocessed_image = normalized_image.astype(np.float32)
+        return preprocessed_image
+
+    def __onnx_get_y_pred(self, outputs):
+        y_pred = {
+            'boxes': [],
+            'labels': [],
+            'scores': []
+        }
+        for output in outputs:
+            y_pred['boxes'].append(torch.from_numpy(output[:4]))
+            y_pred['scores'].append(output[4])
+            y_pred['labels'].append(output[5])
+        return y_pred
+
     def xywh_to_x1y1x2y2(self, boxes: list):
         """
         This method allows you to change the format of the coordinates of the bounding boxes
@@ -291,9 +328,9 @@ class GestureDetector:
             if not y_pred.boxes:
                 return None
             if coords_format == 'xywh':
-                result = {'boxes': y_pred.boxes.xywh, 'labels': y_pred.boxes.cls}
+                result = {'boxes': list(y_pred.boxes.xywh), 'labels': y_pred.boxes.cls}
             else:
-                result = {'boxes': y_pred.boxes.xyxy, 'labels': y_pred.boxes.cls}
+                result = {'boxes': list(y_pred.boxes.xyxy), 'labels': y_pred.boxes.cls}
         if self.model_type == 'SSDLite':
             image_tensor = to_tensor(image).unsqueeze(dim=0)
             y_pred = self.model(image_tensor)[0]
@@ -303,6 +340,18 @@ class GestureDetector:
                 return None
             if coords_format == 'xywh':
                 y_pred['boxes'] = self.x1y1x2y2_to_xywh(y_pred['boxes'])
+            nms_boxes, nms_labels = self.__non_maximum_supression(y_pred['boxes'], y_pred['labels'], iou)
+            result = {'boxes': nms_boxes, 'labels': nms_labels}
+        if self.model_type == 'ONNX':
+            input = self.model.get_inputs()[0]
+            image = self.__onnx_image_preprocess(image, input.shape[2:])
+            outputs = self.model.run(['output0'], {'images': image})[0][0]
+            outputs = outputs[outputs[:, 4] > conf]
+            y_pred = self.__onnx_get_y_pred(outputs)
+            if not y_pred['boxes']:
+                return None
+            if coords_format == 'xyxy':
+                y_pred['boxes'] = self.xywh_to_x1y1x2y2(y_pred['boxes'])
             nms_boxes, nms_labels = self.__non_maximum_supression(y_pred['boxes'], y_pred['labels'], iou)
             result = {'boxes': nms_boxes, 'labels': nms_labels}
         result['labels'] = [NUM_TO_GESTURE[int(cls_name)] for cls_name in result['labels']]

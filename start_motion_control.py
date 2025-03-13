@@ -16,7 +16,16 @@ def start_motion_control():
     with open(os.path.join('configs', 'start_app_config.json'), 'r') as config_file:
         config_dict = json.load(config_file)
     print('Запуск программы...')
-    model = GestureDetector(model_type=config_dict['model_type'], path_to_checkpoint=config_dict['path_to_checkpoint'])
+    model = GestureDetector(
+        #model_type=config_dict['model_type'],
+        #path_to_checkpoint=config_dict['path_to_checkpoint'],
+        #model_type='YOLO',
+        #path_to_checkpoint=os.path.join("checkpoints", "YOLOv10n_gestures.pt"),
+        #model_type='SSDLite',
+        #path_to_checkpoint=os.path.join("checkpoints", "SSDLiteMobileNetV3Large.pth"),
+        model_type='ONNX',
+        path_to_checkpoint=os.path.join("checkpoints", "YOLOv10n_gestures.onnx")
+        )
     executor = CommandExecutor()
     executor.load_commands_dict(config_dict['command_file_path'])
     print('Включение камеры...')
