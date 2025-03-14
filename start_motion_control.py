@@ -1,5 +1,6 @@
 import json
 import os
+import time
 
 import cv2
 
@@ -17,24 +18,24 @@ def start_motion_control():
         config_dict = json.load(config_file)
     print('Запуск программы...')
     model = GestureDetector(
-        #model_type=config_dict['model_type'],
-        #path_to_checkpoint=config_dict['path_to_checkpoint'],
         #model_type='YOLO',
-        #path_to_checkpoint=os.path.join("checkpoints", "YOLOv10n_gestures.pt"),
-        #model_type='SSDLite',
-        #path_to_checkpoint=os.path.join("checkpoints", "SSDLiteMobileNetV3Large.pth"),
-        model_type='ONNX',
-        path_to_checkpoint=os.path.join("checkpoints", "YOLOv10n_gestures.onnx")
-        )
+        #path_to_checkpoint=os.path.join('checkpoints', 'YOLOv10n_gestures.pt'),
+        model_type=config_dict['model_type'],
+        path_to_checkpoint=config_dict['path_to_checkpoint']
+    )
     executor = CommandExecutor()
     executor.load_commands_dict(config_dict['command_file_path'])
     print('Включение камеры...')
     camera = cv2.VideoCapture(config_dict['camera_index'])
     print('Камера включена. Программа работает.')
+    start_time = time.time()
+    FPS_counter = 0
     while True:
         _, image = camera.read()
         image = cv2.flip(image, 1)
         result = model.predict(image, conf=float(config_dict['conf']), iou=float(config_dict['iou']))
+        FPS_counter += 1
+        print(FPS_counter / (time.time() - start_time))
         if result is not None:
             for gesture, box in zip(result['labels'], result['boxes']):
                 executor.execute_command(gesture, tuple(box))

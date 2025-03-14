@@ -244,19 +244,25 @@ class GestureDetector:
         return new_img
 
     def __onnx_image_preprocess(self, image, input_shape):
-        image = self.__onnx_letterbox_image(image, input_shape)
         transposed_image = image.transpose(2, 0, 1)[None, ...]
         normalized_image = transposed_image / 255.0
         preprocessed_image = normalized_image.astype(np.float32)
         return preprocessed_image
 
-    def __onnx_get_y_pred(self, outputs):
+    def __onnx_get_y_pred(self, outputs, input_shape, original_shape):
+        delta_y = input_shape[0] - original_shape[0]
+        delta_x = input_shape[1] - original_shape[1]
         y_pred = {
             'boxes': [],
             'labels': [],
             'scores': []
         }
         for output in outputs:
+            box = output[:4]
+            box[0] = box[0] - delta_x // 2
+            box[1] = box[1] - delta_y // 2
+            box[2] = box[2] - delta_x // 2
+            box[3] = box[3] - delta_y // 2
             y_pred['boxes'].append(torch.from_numpy(output[:4]))
             y_pred['scores'].append(output[4])
             y_pred['labels'].append(output[5])
@@ -344,14 +350,18 @@ class GestureDetector:
             result = {'boxes': nms_boxes, 'labels': nms_labels}
         if self.model_type == 'ONNX':
             input = self.model.get_inputs()[0]
-            image = self.__onnx_image_preprocess(image, input.shape[2:])
+            input_shape = tuple(input.shape[2:])
+            original_image_shape = image.shape[:2]
+            if input_shape != original_image_shape:
+                image = self.__onnx_letterbox_image(image, input_shape)
+            image = self.__onnx_image_preprocess(image, input_shape)
             outputs = self.model.run(['output0'], {'images': image})[0][0]
             outputs = outputs[outputs[:, 4] > conf]
-            y_pred = self.__onnx_get_y_pred(outputs)
+            y_pred = self.__onnx_get_y_pred(outputs, input_shape, original_image_shape)
             if not y_pred['boxes']:
                 return None
-            if coords_format == 'xyxy':
-                y_pred['boxes'] = self.xywh_to_x1y1x2y2(y_pred['boxes'])
+            if coords_format == 'xywh':
+                y_pred['boxes'] = self.x1y1x2y2_to_xywh(y_pred['boxes'])
             nms_boxes, nms_labels = self.__non_maximum_supression(y_pred['boxes'], y_pred['labels'], iou)
             result = {'boxes': nms_boxes, 'labels': nms_labels}
         result['labels'] = [NUM_TO_GESTURE[int(cls_name)] for cls_name in result['labels']]
