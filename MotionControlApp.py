@@ -10,6 +10,7 @@ import cv2
 from cv2_enumerate_cameras import enumerate_cameras
 
 from CommandExecutor import CommandExecutor
+from GestureDetector import GestureDetector
 from interface import Ui_MainWindow
 
 
@@ -323,7 +324,8 @@ class MotionControlApp(QtWidgets.QMainWindow):
         Returns:
             None.
         """
-        filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '', 'PYTORCH Files (*.pt *.pth)')
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '',
+                                                                  'Checkpoint Files (*.pt *.pth *.onnx)')
         if filename:
             self.ui.main_chkpt_file_edit.setText(filename)
 
@@ -347,10 +349,12 @@ class MotionControlApp(QtWidgets.QMainWindow):
             self.__show_message("Ошибка в пути к командному файлу",
                                 message_text,
                                 QtWidgets.QMessageBox.Critical)
-        elif not (os.path.isfile(path_to_checkpoint) and
-                 (path_to_checkpoint.endswith('.pt') or path_to_checkpoint.endswith('.pth'))):
-            message_text = "Чекпойнта по указанному пути не существует, либо он не является файлом с " \
-                           "расширением '.pt' или '.pth'. Проверьте правильность указанного пути."
+        elif not (os.path.isfile(path_to_checkpoint) and (
+                  path_to_checkpoint.endswith('.pt') or
+                  path_to_checkpoint.endswith('.pth') or
+                  path_to_checkpoint.endswith('.onnx'))):
+            message_text = "Чекпойнта по указанному пути не существует, либо он не является файлом с расширением " \
+                           "'.pt', '.pth' или '.onnx'. Проверьте правильность указанного пути."
             self.__show_message("Ошибка в пути к чекпойнту",
                                 message_text,
                                 QtWidgets.QMessageBox.Critical)
@@ -362,6 +366,12 @@ class MotionControlApp(QtWidgets.QMainWindow):
                                 QtWidgets.QMessageBox.Critical)
         elif model_type == 'SSDLite' and not path_to_checkpoint.endswith('.pth'):
             message_text = "Для моделей типа 'SSDLite' используются чекпойнты с расширением '.pth'. " \
+                           "Проверьте правильность указанного пути к чекпойнту."
+            self.__show_message("Ошибка в пути к чекпойнту",
+                                message_text,
+                                QtWidgets.QMessageBox.Critical)
+        elif model_type == 'ONNX' and not path_to_checkpoint.endswith('.onnx'):
+            message_text = "Для моделей типа 'ONNX' используются чекпойнты с расширением '.onnx'. " \
                            "Проверьте правильность указанного пути к чекпойнту."
             self.__show_message("Ошибка в пути к чекпойнту",
                                 message_text,
@@ -604,6 +614,63 @@ class MotionControlApp(QtWidgets.QMainWindow):
                 json.dump(config_dict, command_file)
             os.startfile('detector_training.py')
 
+    def on_open_export_checkpoint_click(self):
+        """
+        Receives the path to the checkpoint of the model being export from the user via FileDialog
+        and inserts this path into the corresponding widget.
+
+        Returns:
+            None.
+        """
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '', 'PYTORCH Files (*.pt *.pth)')
+        if filename:
+            self.ui.export_chkpt_file_edit.setText(filename)
+
+    def on_export_click(self):
+        """
+        Checks the correctness of the entered data, then export model to onnx-format.
+
+        Returns:
+            None.
+        """
+        model_type = self.ui.export_model_type_box.currentText()
+        path_to_checkpoint = self.ui.export_chkpt_file_edit.text()
+        export_height = int(self.ui.export_height_edit.text())
+        export_width = int(self.ui.export_width_edit.text())
+        if not (os.path.isfile(path_to_checkpoint) and
+               (path_to_checkpoint.endswith('.pt') or path_to_checkpoint.endswith('.pth'))):
+            message_text = "Чекпойнта по указанному пути не существует, либо он не является файлом с расширением " \
+                           "'.pt' или '.pth'. Проверьте правильность указанного пути."
+            self.__show_message("Ошибка в пути к чекпойнту",
+                                message_text,
+                                QtWidgets.QMessageBox.Critical)
+        elif model_type == 'YOLO' and not path_to_checkpoint.endswith('.pt'):
+            message_text = "Для моделей типа 'YOLO' используются чекпойнты с расширением '.pt'. " \
+                           "Проверьте правильность указанного пути к чекпойнту."
+            self.__show_message("Ошибка в пути к чекпойнту",
+                                message_text,
+                                QtWidgets.QMessageBox.Critical)
+        elif model_type == 'SSDLite' and not path_to_checkpoint.endswith('.pth'):
+            message_text = "Для моделей типа 'SSDLite' используются чекпойнты с расширением '.pth'. " \
+                           "Проверьте правильность указанного пути к чекпойнту."
+            self.__show_message("Ошибка в пути к чекпойнту",
+                                message_text,
+                                QtWidgets.QMessageBox.Critical)
+        elif (export_height < 10) or (export_width < 10):
+            message_text = "Высота и ширина входного изображения onnx-модели должны быть как минимум двузначными."
+            self.__show_message("Ошибка в размерах входа модели",
+                                message_text,
+                                QtWidgets.QMessageBox.Critical)
+        else:
+            model_to_export = GestureDetector(model_type=model_type, path_to_checkpoint=path_to_checkpoint)
+            model_to_export.to_onnx(input_size=(export_height, export_width))
+            del model_to_export
+            message_text = "Модель успешно экспортирована в onnx-формат. В папке со старым чекпойнтом " \
+                           "сохранён новый чекпойнт с расширением .onnx."
+            self.__show_message("Экспорт",
+                                message_text,
+                                QtWidgets.QMessageBox.Information)
+
     def on_open_test_checkpoint_click(self):
         """
         Receives the path to the checkpoint of the model being tested from the user via FileDialog
@@ -612,7 +679,8 @@ class MotionControlApp(QtWidgets.QMainWindow):
         Returns:
             None.
         """
-        filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '', 'PYTORCH Files (*.pt *.pth)')
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '',
+                                                                  'Checkpoint Files (*.pt *.pth *.onnx)')
         if filename:
             self.ui.test_chkpt_path_edit.setText(filename)
 
@@ -629,10 +697,12 @@ class MotionControlApp(QtWidgets.QMainWindow):
         camera_index = self.ui.test_camera_box.currentIndex()
         confidence = self.ui.test_confidence_edit.text()
         iou = self.ui.test_iou_edit.text()
-        if not (os.path.isfile(path_to_checkpoint) and
-               (path_to_checkpoint.endswith('.pt') or path_to_checkpoint.endswith('.pth'))):
+        if not (os.path.isfile(path_to_checkpoint) and (
+                path_to_checkpoint.endswith('.pt') or
+                path_to_checkpoint.endswith('.pth') or
+                path_to_checkpoint.endswith('.onnx'))):
             message_text = "Чекпойнта по указанному пути не существует, либо он не является файлом с расширением " \
-                           "'.pt' или '.pth'. Проверьте правильность указанного пути."
+                           "'.pt', '.pth' или '.onnx'. Проверьте правильность указанного пути."
             self.__show_message("Ошибка в пути к чекпойнту",
                                 message_text,
                                 QtWidgets.QMessageBox.Critical)
@@ -644,6 +714,12 @@ class MotionControlApp(QtWidgets.QMainWindow):
                                 QtWidgets.QMessageBox.Critical)
         elif model_type == 'SSDLite' and not path_to_checkpoint.endswith('.pth'):
             message_text = "Для моделей типа 'SSDLite' используются чекпойнты с расширением '.pth'. " \
+                           "Проверьте правильность указанного пути к чекпойнту."
+            self.__show_message("Ошибка в пути к чекпойнту",
+                                message_text,
+                                QtWidgets.QMessageBox.Critical)
+        elif model_type == 'ONNX' and not path_to_checkpoint.endswith('.onnx'):
+            message_text = "Для моделей типа 'ONNX' используются чекпойнты с расширением '.onnx'. " \
                            "Проверьте правильность указанного пути к чекпойнту."
             self.__show_message("Ошибка в пути к чекпойнту",
                                 message_text,
@@ -691,6 +767,8 @@ class MotionControlApp(QtWidgets.QMainWindow):
         self.ui.get_start_chkpt_file_button.clicked.connect(self.on_open_start_checkpoint_click)
         self.ui.start_train_button.clicked.connect(self.on_start_training_click)
         self.ui.create_end_chkpt_file_button.clicked.connect(self.on_open_end_checkpoint_click)
+        self.ui.export_button.clicked.connect(self.on_export_click)
+        self.ui.get_export_chkpt_file_button.clicked.connect(self.on_open_export_checkpoint_click)
         self.ui.start_test_button.clicked.connect(self.on_start_test_click)
         self.ui.get_test_chkpt_file_button.clicked.connect(self.on_open_test_checkpoint_click)
         self.ui.get_photo_button.clicked.connect(self.on_get_photo_click)

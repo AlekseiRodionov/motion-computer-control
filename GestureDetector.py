@@ -1,4 +1,5 @@
 import os
+import time
 
 import cv2
 import torch
@@ -47,6 +48,20 @@ NUM_TO_GESTURE = {
     32: 'thumb_index2',
     33: 'no_gesture'
 }
+
+
+def fps_decorator(method):
+    fps = 0
+
+    def decorated(*args, **kwargs):
+        nonlocal fps
+        start_time = time.time()
+        result = method(*args, **kwargs)
+        fps = (fps + 1 / (time.time() - start_time)) / 2
+        print(f'FPS = {fps}')
+        return result
+
+    return decorated
 
 
 class SSDLiteDataset(torch.utils.data.Dataset):
@@ -229,29 +244,72 @@ class GestureDetector:
             boxes, labels = new_boxes, new_labels
         return nms_boxes, nms_labels
 
-    def __onnx_letterbox_image(self, image, expected_size):
-        ih, iw = image.shape[0:2]
-        ew, eh = expected_size
-        scale = min(eh / ih, ew / iw)
-        nh = int(ih * scale)
-        nw = int(iw * scale)
-        image = cv2.resize(image, (nw, nh), interpolation=cv2.INTER_CUBIC)
-        top = (eh - nh) // 2
-        bottom = eh - nh - top
-        left = (ew - nw) // 2
-        right = ew - nw - left
-        new_img = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT)
-        return new_img
+    def __onnx_letterbox_image(self, image: np.ndarray, expected_size: tuple):
+        """
+        The method changes the size of the image while maintaining the proportions. If proportional resizing is
+        impossible (the height must change more than the width or vice versa), then the image itself
+        remains proportional, but black areas are added to it at the top and bottom, or to the right and left.
 
-    def __onnx_image_preprocess(self, image, input_shape):
+        Args:
+            image (np.ndarray): Original image.
+            expected_size (tuple): The size of the new image (height and width).
+
+        Returns:
+            resized_image (np.ndarray): Resized image.
+            no_frames_img_shape (tuple): The size of the resized image without frames.
+            frames_size (tuple): The size of frames added to the image (y-frame-size, x-frame-size).
+        """
+        original_height, original_width = image.shape[0:2]
+        expected_height, expected_width = expected_size
+        scale = min(expected_height / original_height, expected_width / original_width)
+        resized_image_height = int(original_height * scale)
+        resized_image_width = int(original_width * scale)
+        image = cv2.resize(image, (resized_image_width, resized_image_height), interpolation=cv2.INTER_CUBIC)
+        no_frames_img_shape = tuple(image.shape[:2])
+        top = (expected_height - resized_image_height) // 2
+        bottom = expected_height - resized_image_height - top
+        left = (expected_width - resized_image_width) // 2
+        right = expected_width - resized_image_width - left
+        resized_image = cv2.copyMakeBorder(image, top, bottom, left, right, cv2.BORDER_CONSTANT)
+        frames_size = (top, left)
+        return resized_image, no_frames_img_shape, frames_size
+
+    def __onnx_image_preprocess(self, image: np.ndarray):
+        """
+        The method performs image preprocessing required for working with the ONNX-format.
+
+        Args:
+            image (np.ndarray): The original image that will be preprocessed.
+
+        Returns:
+            preprocessed_image (np.ndarray): Preprocessed image.
+        """
         transposed_image = image.transpose(2, 0, 1)[None, ...]
         normalized_image = transposed_image / 255.0
         preprocessed_image = normalized_image.astype(np.float32)
         return preprocessed_image
 
-    def __onnx_get_y_pred(self, outputs, input_shape, original_shape):
-        delta_y = input_shape[0] - original_shape[0]
-        delta_x = input_shape[1] - original_shape[1]
+    def __onnx_get_y_pred(self, outputs: dict, no_frames_img_shape: tuple, original_img_shape: tuple,
+                          frames_size: tuple = (0, 0)):
+        """
+        The method processes the output of the onnx-model and converts it to the standard format of the
+        GestureDetector class. If the output of the model is initially a list of numbers
+        (not designated in any way, just following one after another), then after executing this method,
+        the output is a dictionary in which the coordinates of the bounding boxes, classes, and their
+        probabilities are separately indicated.
+
+        Args:
+            outputs (list): List of values ​​obtained from the output of the onnx-model.
+            no_frames_img_shape (tuple): The shape of the resized image without frames. Necessary to account
+                                         for changes in image dimension (in case of disproportionate changes in
+                                         height and width, see method __onnx_letterbox_image).
+            original_img_shape (tuple): The shape of the original image.
+            frames_size (tuple): The size of frames added to the image (y-frame-size, x-frame-size).
+
+        Returns:
+            y_pred (dict): The transformed output of the onnx model as a dictionary
+                           with keys 'boxes', 'labels' and 'scores'.
+        """
         y_pred = {
             'boxes': [],
             'labels': [],
@@ -259,11 +317,12 @@ class GestureDetector:
         }
         for output in outputs:
             box = output[:4]
-            box[0] = box[0] - delta_x // 2
-            box[1] = box[1] - delta_y // 2
-            box[2] = box[2] - delta_x // 2
-            box[3] = box[3] - delta_y // 2
-            y_pred['boxes'].append(torch.from_numpy(output[:4]))
+            if no_frames_img_shape != original_img_shape:
+                box[0] = (box[0] - frames_size[1]) / no_frames_img_shape[1] * original_img_shape[1]
+                box[1] = (box[1] - frames_size[0]) / no_frames_img_shape[0] * original_img_shape[0]
+                box[2] = (box[2] - frames_size[1]) / no_frames_img_shape[1] * original_img_shape[1]
+                box[3] = (box[3] - frames_size[0]) / no_frames_img_shape[0] * original_img_shape[0]
+            y_pred['boxes'].append(torch.from_numpy(box))
             y_pred['scores'].append(output[4])
             y_pred['labels'].append(output[5])
         return y_pred
@@ -326,8 +385,9 @@ class GestureDetector:
             coords_format (str): The format of the coordinates of the returned bounding boxes.
 
         Returns:
-            result (dict[list, list]): A dictionary containing the bounding boxes of all objects found in the image,
-                                       as well as the corresponding object class names.
+            result (dict[list[Tensor[float]], list[str]]): A dictionary containing the bounding boxes of all objects
+                                                           found in the image, as well as the corresponding object
+                                                           class names.
         """
         if self.model_type == 'YOLO':
             y_pred = self.model.predict(image, verbose=False, show=False, conf=conf, iou=iou)[0]
@@ -349,15 +409,17 @@ class GestureDetector:
             nms_boxes, nms_labels = self.__non_maximum_supression(y_pred['boxes'], y_pred['labels'], iou)
             result = {'boxes': nms_boxes, 'labels': nms_labels}
         if self.model_type == 'ONNX':
-            input = self.model.get_inputs()[0]
-            input_shape = tuple(input.shape[2:])
-            original_image_shape = image.shape[:2]
-            if input_shape != original_image_shape:
-                image = self.__onnx_letterbox_image(image, input_shape)
-            image = self.__onnx_image_preprocess(image, input_shape)
+            model_input = self.model.get_inputs()[0]
+            model_input_shape = tuple(model_input.shape[2:])
+            original_img_shape = tuple(image.shape[:2])
+            no_frames_img_shape = original_img_shape
+            frames_size = (0, 0)
+            if model_input_shape != original_img_shape:
+                image, no_frames_img_shape, frames_size = self.__onnx_letterbox_image(image, model_input_shape)
+            image = self.__onnx_image_preprocess(image)
             outputs = self.model.run(['output0'], {'images': image})[0][0]
             outputs = outputs[outputs[:, 4] > conf]
-            y_pred = self.__onnx_get_y_pred(outputs, input_shape, original_image_shape)
+            y_pred = self.__onnx_get_y_pred(outputs, no_frames_img_shape, original_img_shape, frames_size)
             if not y_pred['boxes']:
                 return None
             if coords_format == 'xywh':
@@ -450,3 +512,18 @@ class GestureDetector:
                 'optimizer_state_dict': optimizer.state_dict(),
             }
             torch.save(checkpoint, final_checkpoint_name)
+
+    def to_onnx(self, input_size: tuple):
+        """
+        The method allows you to export an Ultralytics-model or a PyTorch-model to an ONNX format.
+
+        Args:
+            input_size (tuple): Input size of the ONNH model. The smaller the input size,
+                                the faster the model works and the less accurate it is.
+        Returns:
+            None
+        """
+        if self.model_type == 'YOLO':
+            self.model.export(format='onnx', half=True, imgsz=input_size)
+        elif self.model_type == 'SSDLite':
+            pass

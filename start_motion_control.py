@@ -1,6 +1,5 @@
 import json
 import os
-import time
 
 import cv2
 
@@ -28,14 +27,10 @@ def start_motion_control():
     print('Включение камеры...')
     camera = cv2.VideoCapture(config_dict['camera_index'])
     print('Камера включена. Программа работает.')
-    start_time = time.time()
-    FPS_counter = 0
     while True:
         _, image = camera.read()
         image = cv2.flip(image, 1)
         result = model.predict(image, conf=float(config_dict['conf']), iou=float(config_dict['iou']))
-        FPS_counter += 1
-        print(FPS_counter / (time.time() - start_time))
         if result is not None:
             for gesture, box in zip(result['labels'], result['boxes']):
                 executor.execute_command(gesture, tuple(box))
