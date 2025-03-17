@@ -622,7 +622,7 @@ class MotionControlApp(QtWidgets.QMainWindow):
         Returns:
             None.
         """
-        filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '', 'PYTORCH Files (*.pt *.pth)')
+        filename, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '', 'PYTORCH Files (*.pt)')
         if filename:
             self.ui.export_chkpt_file_edit.setText(filename)
 
@@ -633,26 +633,12 @@ class MotionControlApp(QtWidgets.QMainWindow):
         Returns:
             None.
         """
-        model_type = self.ui.export_model_type_box.currentText()
         path_to_checkpoint = self.ui.export_chkpt_file_edit.text()
         export_height = int(self.ui.export_height_edit.text())
         export_width = int(self.ui.export_width_edit.text())
-        if not (os.path.isfile(path_to_checkpoint) and
-               (path_to_checkpoint.endswith('.pt') or path_to_checkpoint.endswith('.pth'))):
+        if not (os.path.isfile(path_to_checkpoint) and (path_to_checkpoint.endswith('.pt'))):
             message_text = "Чекпойнта по указанному пути не существует, либо он не является файлом с расширением " \
-                           "'.pt' или '.pth'. Проверьте правильность указанного пути."
-            self.__show_message("Ошибка в пути к чекпойнту",
-                                message_text,
-                                QtWidgets.QMessageBox.Critical)
-        elif model_type == 'YOLO' and not path_to_checkpoint.endswith('.pt'):
-            message_text = "Для моделей типа 'YOLO' используются чекпойнты с расширением '.pt'. " \
-                           "Проверьте правильность указанного пути к чекпойнту."
-            self.__show_message("Ошибка в пути к чекпойнту",
-                                message_text,
-                                QtWidgets.QMessageBox.Critical)
-        elif model_type == 'SSDLite' and not path_to_checkpoint.endswith('.pth'):
-            message_text = "Для моделей типа 'SSDLite' используются чекпойнты с расширением '.pth'. " \
-                           "Проверьте правильность указанного пути к чекпойнту."
+                           "'.pt'. Проверьте правильность указанного пути."
             self.__show_message("Ошибка в пути к чекпойнту",
                                 message_text,
                                 QtWidgets.QMessageBox.Critical)
@@ -662,7 +648,7 @@ class MotionControlApp(QtWidgets.QMainWindow):
                                 message_text,
                                 QtWidgets.QMessageBox.Critical)
         else:
-            model_to_export = GestureDetector(model_type=model_type, path_to_checkpoint=path_to_checkpoint)
+            model_to_export = GestureDetector(model_type='YOLO', path_to_checkpoint=path_to_checkpoint)
             model_to_export.to_onnx(input_size=(export_height, export_width))
             del model_to_export
             message_text = "Модель успешно экспортирована в onnx-формат. В папке со старым чекпойнтом " \

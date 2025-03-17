@@ -3,6 +3,7 @@ import time
 
 import cv2
 import torch
+import torch.onnx
 import numpy as np
 import onnxruntime as ort
 from ultralytics import YOLO
@@ -515,7 +516,7 @@ class GestureDetector:
 
     def to_onnx(self, input_size: tuple):
         """
-        The method allows you to export an Ultralytics-model or a PyTorch-model to an ONNX format.
+        The method allows you to export an Ultralytics-model to an ONNX format.
 
         Args:
             input_size (tuple): Input size of the ONNH model. The smaller the input size,
@@ -523,7 +524,4 @@ class GestureDetector:
         Returns:
             None
         """
-        if self.model_type == 'YOLO':
-            self.model.export(format='onnx', half=True, imgsz=input_size)
-        elif self.model_type == 'SSDLite':
-            pass
+        self.model.export(format='onnx', half=True, imgsz=input_size)
